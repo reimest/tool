@@ -1,89 +1,120 @@
-import vk_api
-from vk_api.bot_longpoll import VkBotLongPoll, VkBotEventType
-import json, os, random, time
-from pprint import *
-categories = ['1','2','3']
-all_barah = [75480714,26479371,24749774,2706982,29558743,15708540,77291486,59121430,64981773,123830304,52112894]
-token = 'bb97c044910f7f2c1979d8cb125fb4448592841a8ac03e503a1d4be5d12e7dae97bca5a04e1c69e10e752'
-group_id = 190846662
-vk = vk_api.VkApi(token=token)
-vk._auth_token()
-longpoll = VkBotLongPoll(vk,group_id)
-vk = vk.get_api()
-def say(peer_id,msg):
-    vk.messages.send(peer_id = peer_id, random_id = random.randint(0,2147483647), message = msg)
+
+import sys,time,os,vk_api, requests, json
+
 def auth_handler():
-    say(user_id,"Enter authentication code: ")
-    key = 'none'
+    key = input("enter authentication code: ")
     remember_device = True
     return key, remember_device
 
-if 'data.db' not in os.listdir('.'):
-    json.dump({},open('data.db','w'))
-    data = {}
-else:
-    data = json.load(open('data.db'))
-while True:
-    for event in longpoll.listen():
-        if event.type == VkBotEventType.MESSAGE_NEW:
-            user_id = str(event.object.from_id)
-            if user_id not in data.keys():
-                text = event.object.text
-                if len(text.split()) == 1:
-                    say(int(user_id),'Для начала использования этого инструмента вы должны отправить отправить свой логин и пароль через пробел. Не волнуйтесь, я гарантирую безопасное хранение Ваших данных.')
-                else:
-                    login, password = text.split()[0], text.split()[1]
-                    vk_user = vk_api.VkApi(login, password,auth_handler=auth_handler)
-                    vk_user.auth(token_only=True)
-                    vk_user = vk_user.get_api()
-                    vk_user.wall.post(owner_id = -1 * group_id,message="Hello, world")
-                    data[user_id] = {'passlog':[text.split()[0], text.split()[1]],'text':''}
-            elif user_id in data.keys() and event.object.text.split()[0] == '/reset':
-                data[user_id]['text'] = ''
-                json.dump(data,open('data.db','w'))
-                say(user_id,'Текст для поста сброшен, теперь вы можете написать его заного')
-            elif user_id in data.keys() and data[user_id]['text'] == '':
-                text = event.object.text
-                attachments = event.object.attachments
-                atch = []
-                for attach in attachments:
-                    atch.append(attach['type'] + str(attach[attach['type']]['owner_id']) + '_' + str(attach[attach['type']]['id']))
-                data[user_id]['text'] = [text,atch]
-                json.dump(data,open('data.db','w'))
-                say(user_id,'Проверьте правильность поста. Чтобы сбросить напишите /reset\n\nТеперь введите номер, по каким категориям рассылать.')
-                say(user_id,'1. Общие барахолки\n2.Вейп барахолки(Недоступно)\n3.Барахолки электроники(Недоступно)')
-                say(user_id,'Сразу после выбора категории начнется рассылка - не выбирайте, если не уверены')
-            elif user_id in data.keys() and data[user_id]['text'] != '' and event.object.text.split()[0] in categories:
-                login, password = data[user_id]['passlog'][0], data[user_id]['passlog'][1]
-                vk_user = vk_api.VkApi(login, password)
-                vk_user.auth(token_only=True)
-                vk_user = vk_user.get_api()
-                    
-                categor = event.object.text.split()[0]
-                if categor == '1': select = all_barah
-                for group in select:
-                    try:
-                        vk_user.wall.post(owner_id = -1 * group,message=data[user_id]['text'][0],attachments = ','.join(data[user_id]['text'][1]))
-                        say(user_id,'Пост отправлен: @club{}'.format(group))
-                    except:
-                        say(user_id,'Пост не был отправлен: @club{}'.format(group))
-                    time.sleep(20)
-            #elif user_id in data.keys() and data[user_id]['text'] != '':
-                
-            
-                    # if attach['type'] == 'photo': #types: photo,doc,audio,video
-                       # width = 0
-                        #for size in attach[attach['type']]['sizes']:
-                       #     if size['width'] > width:
-                         #       width = size['width']
-                        #        url = size['url']
-                        #        type_ = size['type']
-                       # atch[url] = 'photo'
-                    #if attach['type'] == 'doc':
-                    #    atch[attach['doc']['url']] = 'doc'
-                    #if attach['type'] == 'audio':
-                    #    atch[attach['audio']['url']] = 'audio'
-                    #if attach ['type'] == 'video':
-                     #   atch['video{}_{}'.format(attach['video']['owner_id'],attach['video']['id'])] = 'video'
-                     #   say(user_id,'vk.com/video{}_{}'.format(attach['video']['owner_id'],attach['video']['id']))
+def main():
+    interval = 40
+    #----login----
+    while True:
+        try:
+            print('  >>> log in please\n')
+            login = input('login: ')
+            passw = input('password: ')
+            sys.stdout.write('\rlogining with ur account...')
+            vk_user = vk_api.VkApi(login, passw,auth_handler=auth_handler)
+            vk_user.auth(token_only=True)
+            vk = vk_user.get_api()
+            sys.stdout.write('\rlogining with ur account...[done]\n\n')
+            break
+        except:
+            sys.stdout.write('\rlogining with ur account...[failed]\n\n')
+            print('uncorrect vk_data \ncheck your login or password\n\n')
+    print('account: {} {}\n'.format(vk.account.getProfileInfo()['first_name'],vk.account.getProfileInfo()['last_name']))
+    time.sleep(2)
+    
+    #----ids_of_groups----
+    ids = {}
+    sys.stdout.write('\rparsing ids of groups from DIR ids...')
+    try:
+        for txt_name in os.listdir('ids'):
+            ids[os.listdir('ids').index(txt_name)+1] = [txt_name.replace('.txt',''),json.loads(open('ids/{}'.format(txt_name),'rb').read())]
+        sys.stdout.write('\rparsing ids of groups from DIR ids...[done]\n')
+    except:
+        sys.stdout.write('\rparsing ids of groups from DIR ids...[failed]\n')
+    time.sleep(2)
+    #----text----
+    sys.stdout.write('\rgetting text from text.txt...')
+    try:
+        with open('text.txt', 'rb') as f:
+            text = f.read()
+        sys.stdout.write('\rgetting text from text.txt...[done]\n')
+    except:
+        sys.stdout.write('\rgetting text from text.txt...[failed]\n')
+    time.sleep(2)
 
+
+        
+     #----photos----
+    sys.stdout.write('\rcheching photos from DIR photos...')
+    try:
+        files = os.listdir('photos')
+        photos_ = []
+        for name in files:
+            try:
+                form = name[name.index('.',-4):]
+            except:
+                continue
+            if form in ['.png','.jpg']:
+                photos_.append(name)
+        sys.stdout.write('\rcheching photos from DIR photos...[done]\n\n\n')
+        print('count of photos: {}\n\n'.format(len(photos_)))
+        time.sleep(2)
+        if len(photos_) != 0:
+            print('list of photos:\n\n   > {}\n'.format('\n   > '.join(photos_)))
+            time.sleep(2)
+    except:
+        sys.stdout.write('\rcheching photos from DIR photos...[failed]\n')
+        time.sleep(2)
+
+        
+    #uploading_photos
+    if len(photos_) != 0:
+        sys.stdout.write('\ruploading photos on server...')
+        try:
+            uploaded_photos = []
+            for ph in photos_:
+                upload_url = vk.photos.getWallUploadServer()
+                post = requests.post(url=upload_url["upload_url"], files={"photo": open('photos/'+ph, "rb")}).json()
+                attch = vk.photos.saveWallPhoto(photo=post['photo'],server=post['server'],hash=post['hash'])[0]
+                uploaded_photos.append('photo'+str(attch['owner_id'])+'_'+str(attch['id']))
+            sys.stdout.write('\ruploading photos on server...[done]\n\n')
+        except:
+            sys.stdout.write('\ruploading photos on server...[failed]')
+            return
+        
+    #start_posting
+    print('choose kit of groups to posting:\n ')
+    for i in ids.keys():
+        print('\t{}) {}'.format(str(i),ids[i][0]) )
+    print('\t0) exit')
+    print()
+    while True:
+        try:
+            ch = int(input('> '))
+        except:
+            print('!!!invalid input!!!')
+            continue
+        if ch == 0:
+            print('goodbye.')
+            return
+        elif ch in ids.keys():
+            break
+        else:
+            print('!!!invalid input!!!')
+    if input('start posting?[y/n]').lower() in ['y','д','yes','ye','да']:     
+        for group_id in ids[ch][1]:
+            try:
+                vk.wall.post(owner_id = -1 * group_id,message=text.decode('Windows-1251'),attachments = uploaded_photos)
+                print('[done] https://vk.com/club{} '.format(group_id))
+            except:
+                print('[!!!][failed] https://vk.com/club{} '.format(group_id))
+            time.sleep(interval)
+    else:
+        return
+            
+if __name__ == '__main__':
+    main()
